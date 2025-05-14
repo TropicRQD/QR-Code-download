@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#4CAF50" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon-192.png" type="image/png" />
+  <title>QR Binary Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <div id="offlineBanner" style="display:none;background:#ff9800;color:white;text-align:center;padding:20px;font-size:2rem;">
+    ⚠️ Offline mode active. Scans will be saved locally.
+  </div>
+
+  <h2>Scan Binary QR Code</h2>
+
+  <div id="reader-container" style="width:100%;max-width:600px;height:600px;margin:40px auto;">
+    <div id="reader" style="width:100%;height:100%;border-radius:24px;box-shadow:0 0 20px rgba(0,0,0,0.25);"></div>
+  </div>
+
+  <p id="status" style="text-align:center;font-size:2rem;">Waiting for scan...</p>
+
+  <div id="formContainer" style="display:none;max-width:600px;margin:40px auto;background:white;padding:36px;border-radius:20px;">
+    <label>In or Out:</label>
+    <select id="inOut" required>
+      <option value="" disabled selected>Select direction</option>
+      <option value="In">In</option>
+      <option value="Out">Out</option>
+    </select>
+
+    <label>Agent Name:</label>
+    <input type="text" id="agentName" placeholder="e.g., John Doe" required>
+
+    <label>Manager Name:</label>
+    <input type="text" id="managerName" placeholder="e.g., Jane Smith" required>
+
+    <label>Other Equipment:</label>
+    <input type="text" id="otherEquip" placeholder="e.g., toolbox">
+
+    <label>Quantity:</label>
+    <input type="number" id="quantity" value="1" required>
+
+    <button id="submitBtn" onclick="submitScan()" disabled>Submit Scan</button>
+  </div>
+
+  <script>
+    let lastDecoded = '';
+    let isReady = true;
+    let timeoutHandler = null;
+    const submitBtn = document.getElementById("submitBtn");
+    const inOutSelect = document.getElementById("inOut");
+    const offlineBanner = document.getElementById("offlineBanner");
+
+    function updateOfflineBanner() {
+      offlineBanner.style.display = navigator.onLine ? "none" : "block";
+    }
+
+    inOutSelect.addEventListener("change", () => {
+      submitBtn.disabled = inOutSelect.value === "";
+    });
+
+    function binaryToText(binaryStr) {
+      const clean = binaryStr.replace(/\s+/g, '');
+      return (clean.match(/.{1,8}/g) || []).map(b => String.fromCharCode(parseInt(b, 2))).join('');
+    }
+
+    function isValidBinary(str) {
+      const clean = str.replace(/\s+/g, '');
+      return /^[01]+$/.test(clean) && clean.length % 8 === 0;
+    }
+
+    function showScanTimeoutWarning() {
+      const status = document.getElementById('status');
+      if (isReady) status.innerHTML = "⚠️ Unable to read QR code.";
+    }
+
+    function resetScanTimeout() {
+      clearTimeout(timeoutHandler);
+      timeoutHandler = setTimeout(showScanTimeoutWarning, 6000);
+    }
+
+    function onScanSuccess(decodedText) {
+      if (!isReady) return;
+      if (!isValidBinary(decodedText)) {
+        document.getElementById("status").innerHTML = "❌ Invalid QR code.";
+        return;
+      }
+      isReady = false;
+      clearTimeout(timeoutHandler);
+      lastDecoded = binaryToText(decodedText);
+      document.getElementById("status").innerHTML = "✅ Scan successful.";
+      document.getElementById("formContainer").style.display = "block";
+    }
+
+    function submitScan() {
+      const scanData = {
+        decodedText: lastDecoded,
+        inOut: document.getElementById("inOut").value,
+        agent: document.getElementById("agentName").value || "N/A",
+        manager: document.getElementById("managerName").value || "N/A",
+        otherEquip: document.getElementById("otherEquip").value || "N/A",
+        quantity: parseInt(document.getElementById("quantity").value) || 1
+      };
+
+      document.getElementById("status").innerText = "📤 Uploading scan...";
+
+      if (navigator.onLine) {
+        uploadScan(scanData);
+      } else {
+        queueOfflineScan(scanData);
+        document.getElementById("status").innerText = "📦 Saved offline.";
+        resetScanner();
+      }
+    }
+
+    function uploadScan(scan) {
+      fetch("https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec", {
+        method: "POST",
+        body: JSON.stringify(scan),
+        headers: { "Content-Type": "application/json" }
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          document.getElementById("status").innerText = "✅ Uploaded.";
+        } else {
+          queueOfflineScan(scan);
+          document.getElementById("status").innerText = "⚠️ Upload failed. Saved offline.";
+        }
+        resetScanner();
+      }).catch(() => {
+        queueOfflineScan(scan);
+        document.getElementById("status").innerText = "⚠️ Upload failed. Saved offline.";
+        resetScanner();
+      });
+    }
+
+    function queueOfflineScan(scan) {
+      const queue = JSON.parse(localStorage.getItem("offlineScans") || "[]");
+      queue.push(scan);
+      localStorage.setItem("offlineScans", JSON.stringify(queue));
+    }
+
+    function tryUploadOfflineScans() {
+      const queue = JSON.parse(localStorage.getItem("offlineScans") || "[]");
+      if (!navigator.onLine || queue.length === 0) return;
+      const scan = queue.shift();
+      uploadScan(scan);
+      localStorage.setItem("offlineScans", JSON.stringify(queue));
+    }
+
+    function resetScanner() {
+      isReady = true;
+      document.getElementById("formContainer").style.display = "none";
+      document.getElementById("inOut").selectedIndex = 0;
+      document.getElementById("agentName").value = '';
+      document.getElementById("managerName").value = '';
+      document.getElementById("otherEquip").value = '';
+      document.getElementById("quantity").value = '1';
+      document.getElementById("status").innerText = "Ready for next scan.";
+      submitBtn.disabled = true;
+      resetScanTimeout();
+    }
+
+    window.addEventListener("online", () => {
+      updateOfflineBanner();
+      tryUploadOfflineScans();
+    });
+
+    window.addEventListener("offline", updateOfflineBanner);
+
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 500 }, onScanSuccess)
+      .catch(err => document.getElementById("status").innerText = "❌ Camera error: " + err);
+
+    updateOfflineBanner();
+    resetScanTimeout();
+    tryUploadOfflineScans();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
+    }
+  </script>
+</body>
+</html>
