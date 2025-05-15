@@ -212,27 +212,29 @@
       }
     }
 
-    function uploadScan(scan) {
-      fetch("https://script.google.com/macros/s/AKfycbxDwpU1WNnkHzcgoIM5fllAAhXh-7R80ATe9PFdG1mGm_AB3fjhLLVMGZOydbxXdT5sew/exec", {
-        method: "POST",
-        body: JSON.stringify(scan),
-        headers: { "Content-Type": "application/json" }
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res.success) {
-          document.getElementById("status").innerText = "✅ Uploaded.";
-        } else {
-          queueOfflineScan(scan);
-          document.getElementById("status").innerText = "⚠️ Upload failed. Saved offline.";
-        }
-        resetScanner();
-      }).catch(() => {
-        queueOfflineScan(scan);
-        document.getElementById("status").innerText = "⚠️ Upload failed. Saved offline.";
-        resetScanner();
-      });
-    }
+function uploadScan(scan) {
+  fetch("https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec", {
+    method: "POST",
+    body: JSON.stringify(scan),
+    headers: { "Content-Type": "application/json" }
+  })
+  .then(r => {
+    console.log("🛰️ Response status:", r.status);
+    return r.json();
+  })
+  .then(res => {
+    console.log("✅ Upload result:", res);
+    document.getElementById("status").innerText = "✅ Uploaded.";
+    resetScanner();
+  })
+  .catch(err => {
+    console.error("❌ Upload failed:", err);
+    document.getElementById("status").innerText = "⚠️ Upload error. Saved offline.";
+    queueOfflineScan(scan);
+    resetScanner();
+  });
+}
+
 
     function queueOfflineScan(scan) {
       const queue = JSON.parse(localStorage.getItem("offlineScans") || "[]");
