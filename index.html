@@ -8,38 +8,132 @@
   <link rel="icon" href="icon-192.png" type="image/png" />
   <title>QR Binary Scanner</title>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 36px;
+      margin: 0;
+      background: #f8f8f8;
+      font-size: 2rem;
+    }
+
+    h2 {
+      text-align: center;
+      font-size: 3rem;
+    }
+
+    #reader-container {
+      width: 100%;
+      max-width: 600px;
+      height: 600px;
+      margin: 40px auto;
+      position: relative;
+    }
+
+    #reader {
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0,0,0,0.25);
+    }
+
+    #overlay {
+      position: absolute;
+      top: 25%;
+      left: 25%;
+      width: 50%;
+      height: 50%;
+      border: 6px dashed red;
+      border-radius: 20px;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #offlineBanner {
+      display: none;
+      background: #ff9800;
+      color: white;
+      text-align: center;
+      padding: 20px;
+      font-size: 1.8rem;
+    }
+
+    #status {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-top: 30px;
+    }
+
+    #formContainer {
+      display: none;
+      max-width: 600px;
+      margin: 40px auto;
+      background: white;
+      padding: 36px;
+      border-radius: 20px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.15);
+    }
+
+    input, select, button {
+      padding: 20px;
+      font-size: 1.8rem;
+      width: 100%;
+      margin-bottom: 20px;
+      border-radius: 16px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    button:hover:enabled {
+      background-color: #45a049;
+    }
+  </style>
 </head>
 <body>
-  <div id="offlineBanner" style="display:none;background:#ff9800;color:white;text-align:center;padding:20px;font-size:2rem;">
+  <div id="offlineBanner">
     ⚠️ Offline mode active. Scans will be saved locally.
   </div>
 
   <h2>Scan Binary QR Code</h2>
 
-  <div id="reader-container" style="width:100%;max-width:600px;height:600px;margin:40px auto;">
-    <div id="reader" style="width:100%;height:100%;border-radius:24px;box-shadow:0 0 20px rgba(0,0,0,0.25);"></div>
+  <div id="reader-container">
+    <div id="reader"></div>
+    <div id="overlay"></div>
   </div>
 
-  <p id="status" style="text-align:center;font-size:2rem;">Waiting for scan...</p>
+  <p id="status">Waiting for scan...</p>
 
-  <div id="formContainer" style="display:none;max-width:600px;margin:40px auto;background:white;padding:36px;border-radius:20px;">
-    <label>In or Out:</label>
+  <div id="formContainer">
+    <label for="inOut">In or Out:</label>
     <select id="inOut" required>
       <option value="" disabled selected>Select direction</option>
       <option value="In">In</option>
       <option value="Out">Out</option>
     </select>
 
-    <label>Agent Name:</label>
+    <label for="agentName">Agent Name:</label>
     <input type="text" id="agentName" placeholder="e.g., John Doe" required>
 
-    <label>Manager Name:</label>
+    <label for="managerName">Manager Name:</label>
     <input type="text" id="managerName" placeholder="e.g., Jane Smith" required>
 
-    <label>Other Equipment:</label>
+    <label for="otherEquip">Other Equipment:</label>
     <input type="text" id="otherEquip" placeholder="e.g., toolbox">
 
-    <label>Quantity:</label>
+    <label for="quantity">Quantity:</label>
     <input type="number" id="quantity" value="1" required>
 
     <button id="submitBtn" onclick="submitScan()" disabled>Submit Scan</button>
@@ -116,7 +210,7 @@
     }
 
     function uploadScan(scan) {
-      fetch("https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec", {
+      fetch("https://script.google.com/a/macros/rqdirect.com/s/AKfycbyxzXk63I6lEqTIiTy8GqF9QFzpjnOIEKui2QsfauPGX1w7wrLz0lhgiPlWTHxfTR3T0Q/exec", {
         method: "POST",
         body: JSON.stringify(scan),
         headers: { "Content-Type": "application/json" }
@@ -172,8 +266,13 @@
     window.addEventListener("offline", updateOfflineBanner);
 
     const html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 500 }, onScanSuccess)
-      .catch(err => document.getElementById("status").innerText = "❌ Camera error: " + err);
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 500 },
+      onScanSuccess
+    ).catch(err => {
+      document.getElementById("status").innerText = "❌ Camera error: " + err;
+    });
 
     updateOfflineBanner();
     resetScanTimeout();
